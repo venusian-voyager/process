@@ -3,6 +3,10 @@
 namespace Voyager\Process;
 
 use Countable;
+use Throwable;
+use Voyager\Vessel\ControlPanel;
+use Voyager\Contracts\IOPools\Loop;
+use Voyager\Contracts\IOPools\Promise;
 use Voyager\NutsAndBolts\Collection;
 
 class InvokedProcessPool implements Countable
@@ -65,6 +69,47 @@ class InvokedProcessPool implements Countable
     public function wait()
     {
         return new ProcessPoolResults((new Collection($this->invokedProcesses))->map->wait()->all());
+    }
+
+    /**
+     * Wait for the processes to finish without blocking the loop.
+     *
+     * @return \Voyager\Contracts\IOPools\Promise  the ProcessPoolResults, keyed as the pool was, or the first failure to wait
+     */
+    public function waitAsync(): Promise
+    {
+        $all = ControlPanel::getInstance()->get(Loop::class)->promise();
+        $results = array_fill_keys(array_keys($this->invokedProcesses), null);
+        $left = count($this->invokedProcesses);
+
+        if ($left === 0) {
+            $all->resolve(new ProcessPoolResults([]));
+
+            return $all;
+        }
+
+        foreach ($this->invokedProcesses as $key => $process) {
+            $process->waitAsync()->then(
+                function (mixed $result) use ($key, $all, &$results, &$left): mixed {
+                    $results[$key] = $result;
+
+                    if (--$left === 0) {
+                        $all->resolve(new ProcessPoolResults($results));
+                    }
+
+                    return $result;
+                },
+                function (Throwable $e) use ($all): null {
+                    if (! $all->settled()) {
+                        $all->reject($e);
+                    }
+
+                    return null;
+                },
+            );
+        }
+
+        return $all;
     }
 
     /**

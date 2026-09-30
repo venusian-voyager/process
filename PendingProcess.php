@@ -3,6 +3,7 @@
 namespace Voyager\Process;
 
 use Closure;
+use Voyager\Contracts\IOPools\Promise;
 use Voyager\Process\Exceptions\ProcessTimedOutException;
 use Voyager\NutsAndBolts\Collection;
 use Voyager\NutsAndBolts\DataObjects\Str;
@@ -285,7 +286,27 @@ class PendingProcess
             throw new RuntimeException('Attempted process ['.$command.'] without a matching fake.');
         }
 
-        return new InvokedProcess(tap($process)->start($output));
+        $invoked = new InvokedProcess($process);
+
+        // Output goes through the invoked process, so waitAsync() can add a callback later. With
+        // output disabled Symfony refuses any callback, and $output is handed over for it to refuse.
+        $process->start($process->isOutputDisabled() ? $output : $invoked->relay($output));
+
+        return $invoked;
+    }
+
+    /**
+     * Start the process and wait for it without blocking the loop.
+     *
+     * @param  array<array-key, string>|string|null  $command
+     * @param  callable|null  $output
+     * @return \Voyager\Contracts\IOPools\Promise  the ProcessResult, or a ProcessTimedOutException
+     *
+     * @throws \RuntimeException
+     */
+    public function runAsync(array|string|null $command = null, ?callable $output = null): Promise
+    {
+        return $this->start($command, $output)->waitAsync();
     }
 
     /**

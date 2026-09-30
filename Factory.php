@@ -2,6 +2,7 @@
 
 namespace Voyager\Process;
 
+use Voyager\Contracts\IOPools\Promise;
 use Closure;
 use Voyager\Contracts\Process\ProcessResult as ProcessResultContract;
 use Voyager\NutsAndBolts\Collection;
@@ -290,6 +291,22 @@ class Factory
     }
 
     /**
+     * Run a series of piped processes without blocking the loop.
+     *
+     * @param  callable|array  $callback
+     * @param  callable|null  $output
+     * @return \Voyager\Contracts\IOPools\Promise  the last process's ProcessResult
+     */
+    public function pipeAsync(callable|array $callback, ?callable $output = null): Promise
+    {
+        return is_array($callback)
+            ? (new Pipe($this, fn ($pipe) => (new Collection($callback))->each(
+                fn ($command) => $pipe->command($command)
+            )))->runAsync(output: $output)
+            : (new Pipe($this, $callback))->runAsync(output: $output);
+    }
+
+    /**
      * Run a pool of processes and wait for them to finish executing.
      *
      * @param  callable  $callback
@@ -299,6 +316,18 @@ class Factory
     public function concurrently(callable $callback, ?callable $output = null)
     {
         return (new Pool($this, $callback))->start($output)->wait();
+    }
+
+    /**
+     * Run a pool of processes and wait for them to finish without blocking the loop.
+     *
+     * @param  callable  $callback
+     * @param  callable|null  $output
+     * @return \Voyager\Contracts\IOPools\Promise  the ProcessPoolResults
+     */
+    public function concurrentlyAsync(callable $callback, ?callable $output = null): Promise
+    {
+        return (new Pool($this, $callback))->runAsync($output);
     }
 
     /**

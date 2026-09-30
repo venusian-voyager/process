@@ -2,6 +2,9 @@
 
 namespace Voyager\Process;
 
+use Voyager\Vessel\ControlPanel;
+use Voyager\Contracts\IOPools\Loop;
+use Voyager\Contracts\IOPools\Promise;
 use Voyager\Contracts\Process\InvokedProcess as InvokedProcessContract;
 
 class FakeInvokedProcess implements InvokedProcessContract
@@ -284,6 +287,21 @@ class FakeInvokedProcess implements InvokedProcessContract
         $this->remainingRunIterations = 0;
 
         return $this->process->toProcessResult($this->command);
+    }
+
+    /**
+     * Wait for the fake to finish: its output goes to the callback, and the promise is settled
+     * with its predicted result before this returns.
+     *
+     * @param  callable|null  $output
+     * @return \Voyager\Contracts\IOPools\Promise  the fake's ProcessResult
+     */
+    public function waitAsync(?callable $output = null): Promise
+    {
+        $settled = ControlPanel::getInstance()->get(Loop::class)->promise();
+        $settled->resolve($this->wait($output));
+
+        return $settled;
     }
 
     /**

@@ -2,6 +2,11 @@
 
 namespace Voyager\Process;
 
+use Closure;
+use LogicException;
+use Voyager\Vessel\ControlPanel;
+use Voyager\Contracts\IOPools\Loop;
+use Voyager\Contracts\IOPools\Promise;
 use Voyager\Contracts\Process\InvokedProcess as InvokedProcessContract;
 use Voyager\Process\Exceptions\ProcessTimedOutException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException as SymfonyTimeoutException;
@@ -15,6 +20,15 @@ class InvokedProcess implements InvokedProcessContract
      * @var \Symfony\Component\Process\Process
      */
     protected $process;
+
+    /** The callback start() was given, handed the output as it is read. */
+    protected ?Closure $started_output = null;
+
+    /** The callback waitAsync() was given, handed the output read from then on. */
+    protected ?Closure $waiting_output = null;
+
+    /** The watch waitAsync() put on the loop. */
+    protected ?ProcessWatch $watch = null;
 
     /**
      * Create a new invoked process instance.
@@ -154,6 +168,53 @@ class InvokedProcess implements InvokedProcessContract
         } catch (SymfonyTimeoutException $e) {
             throw new ProcessTimedOutException($e, new ProcessResult($this->process));
         }
+    }
+
+    /**
+     * Wait for the process to finish without blocking the loop.
+     *
+     * @param  callable|null  $output  handed the output read from now on, as ($type, $buffer)
+     * @return \Voyager\Contracts\IOPools\Promise  the ProcessResult, or a ProcessTimedOutException
+     */
+    public function waitAsync(?callable $output = null): Promise
+    {
+        if (! is_null($output)) {
+            if ($this->process->isOutputDisabled()) {
+                $refused = ControlPanel::getInstance()->get(Loop::class)->promise();
+                $refused->reject(new LogicException('Output has been disabled, enable it to allow the use of a callback.'));
+
+                return $refused;
+            }
+
+            $this->waiting_output = $output(...);
+        }
+
+        $this->watch ??= ProcessWatch::watch(
+            $this->process, ! is_null($this->started_output) || ! is_null($this->waiting_output),
+        );
+
+        return $this->watch->promise();
+    }
+
+    /**
+     * The callback PendingProcess::start() hands Symfony when the process starts: the output goes
+     * to start()'s callback, and to waitAsync()'s once one is given.
+     *
+     * @internal
+     */
+    public function relay(?callable $output): Closure
+    {
+        $this->started_output = is_null($output) ? null : $output(...);
+
+        return function (string $type, string $buffer): void {
+            if ($this->started_output) {
+                ($this->started_output)($type, $buffer);
+            }
+
+            if ($this->waiting_output) {
+                ($this->waiting_output)($type, $buffer);
+            }
+        };
     }
 
     /**

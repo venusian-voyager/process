@@ -2,6 +2,7 @@
 
 namespace Voyager\Process;
 
+use Voyager\Contracts\IOPools\Promise;
 use Voyager\NutsAndBolts\Collection;
 use InvalidArgumentException;
 
@@ -93,6 +94,17 @@ class Pool
     public function run()
     {
         return $this->wait();
+    }
+
+    /**
+     * Start the processes and wait for them to finish without blocking the loop.
+     *
+     * @param  callable|null  $output
+     * @return \Voyager\Contracts\IOPools\Promise  the ProcessPoolResults
+     */
+    public function runAsync(?callable $output = null): Promise
+    {
+        return $this->start($output)->waitAsync();
     }
 
     /**

@@ -13,11 +13,16 @@
     ],
     "require": {
         "php": "^8.4|^8.5",
-        "venusian-voyager/collections": "^0.9.0",
-        "venusian-voyager/contracts": "^0.9.0",
-        "venusian-voyager/macroable": "^0.9.0",
-        "venusian-voyager/nuts-and-bolts": "^0.9.0",
-        "symfony/process": "^8.0.0"
+        "symfony/process": "^8.0.0",
+        "venusian-voyager/collections": "^0.10.0",
+        "venusian-voyager/conditionable": "^0.10.0",
+        "venusian-voyager/contracts": "^0.10.0",
+        "venusian-voyager/macroable": "^0.10.0",
+        "venusian-voyager/nuts-and-bolts": "^0.10.0",
+        "venusian-voyager/vessel": "^0.10.0"
+    },
+    "suggest": {
+        "venusian-voyager/io-pools": "Required for waitAsync() and the other *Async() methods: they wait on its loop (^0.10.0)."
     },
     "autoload": {
         "psr-4": {
@@ -26,7 +31,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "0.9.x-dev"
+            "dev-main": "0.10.x-dev"
         }
     },
     "config": {
