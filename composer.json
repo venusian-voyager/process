@@ -12,7 +12,7 @@
         }
     ],
     "require": {
-        "php": "^8.4|^8.5",
+        "php": "~8.4.27||^8.5.12",
         "symfony/process": "^8.0.0",
         "venusian-voyager/collections": "^0.10.0",
         "venusian-voyager/conditionable": "^0.10.0",
